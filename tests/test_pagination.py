@@ -14,11 +14,12 @@ from pyes.managers import Indices
 import trytond.tests.test_tryton
 from trytond.tests.test_tryton import POOL, USER, DB_NAME, CONTEXT
 from trytond.transaction import Transaction
-from trytond.config import CONFIG
+from trytond.config import config
 from nereid.testing import NereidTestCase
 from pagination import ElasticPagination
 
-CONFIG['elastic_search_server'] = "http://localhost:9200"
+config.add_section('elastic_search')
+config.set('elastic_search', 'server_uri', 'http://localhost:9200')
 
 
 class TestPagination(NereidTestCase):
@@ -331,7 +332,6 @@ class TestPagination(NereidTestCase):
 
             category, = self.ProductCategory.create([{
                 'name': 'Test Category',
-                'uri': 'test-category',
             }])
             uom, = self.Uom.search([('symbol', '=', 'u')])
             template, = self.ProductTemplate.create([{
