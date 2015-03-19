@@ -16,10 +16,7 @@ from pyes import BoolQuery, MatchQuery
 import trytond.tests.test_tryton
 from trytond.tests.test_tryton import POOL, USER, DB_NAME, CONTEXT
 from trytond.transaction import Transaction
-from trytond.config import CONFIG
 from nereid.testing import NereidTestCase
-
-CONFIG['elastic_search_server'] = "http://localhost:9200"
 
 
 class TestProduct(NereidTestCase):
@@ -77,7 +74,6 @@ class TestProduct(NereidTestCase):
         """
         category, = self.ProductCategory.create([{
             'name': 'Test Category',
-            'uri': 'test-category',
         }])
         uom, = self.Uom.search([('symbol', '=', 'u')])
 
@@ -394,6 +390,7 @@ class TestProduct(NereidTestCase):
             'name': 'Default Shop',
             'price_list': shop_price_list,
             'warehouse': warehouse,
+            'currency': usd.id,
             'payment_term': payment_term,
             'company': self.company.id,
             'users': [('add', [USER])]
@@ -453,7 +450,6 @@ class TestProduct(NereidTestCase):
 
             category_automobile, = self.ProductCategory.create([{
                 'name': 'Automobile',
-                'uri': 'automobile',
             }])
             uom, = self.Uom.search([('symbol', '=', 'u')])
 
