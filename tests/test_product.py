@@ -47,7 +47,7 @@ class TestProduct(NereidTestCase):
         self.Sale = POOL.get('sale.sale')
         self.Language = POOL.get('ir.lang')
         self.NereidWebsite = POOL.get('nereid.website')
-        self.SaleShop = POOL.get('sale.shop')
+        self.SaleChannel = POOL.get('sale.channel')
         self.Country = POOL.get('country.country')
         self.Subdivision = POOL.get('country.subdivision')
         self.NereidUser = POOL.get('nereid.user')
@@ -333,7 +333,7 @@ class TestProduct(NereidTestCase):
         # Create a payment term
         payment_term, = self._create_payment_term()
 
-        shop_price_list, user_price_list = self._create_pricelists()
+        channel_price_list, user_price_list = self._create_pricelists()
         party1, = self.Party.create([{
             'name': 'Guest User',
         }])
@@ -386,16 +386,27 @@ class TestProduct(NereidTestCase):
             'currency': usd.id,
         }])
 
-        self.shop, = self.SaleShop.create([{
-            'name': 'Default Shop',
-            'price_list': shop_price_list,
+        self.channel, = self.SaleChannel.create([{
+            'name': 'Default Channel',
+            'price_list': channel_price_list,
             'warehouse': warehouse,
             'currency': usd.id,
             'payment_term': payment_term,
             'company': self.company.id,
-            'users': [('add', [USER])]
+            'create_users': [('add', [USER])],
+            'invoice_method': 'order',
+            'shipment_method': 'order',
+            'source': 'manual'
         }])
-        self.User.set_preferences({'shop': self.shop})
+        self.User.set_preferences({'current_channel': self.channel})
+
+        self.User.write(
+            [self.User(USER)], {
+                'main_company': self.company.id,
+                'company': self.company.id,
+                'current_channel': self.channel,
+            }
+        )
 
         self.default_node, = self.Node.create([{
             'name': 'root',
@@ -413,7 +424,7 @@ class TestProduct(NereidTestCase):
         }])
         self.NereidWebsite.create([{
             'name': 'localhost',
-            'shop': self.shop,
+            'channel': self.channel,
             'company': self.company.id,
             'application_user': USER,
             'default_locale': self.locale_en_us.id,
