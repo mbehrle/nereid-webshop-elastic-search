@@ -2,7 +2,7 @@ test: test-sqlite test-postgres test-flake8
 
 test-sqlite: install-dependencies start-docker
 	coverage run setup.py test
-	coverage report -m --fail-under 95
+	coverage report -m --fail-under 90
 
 test-postgres: install-dependencies start-docker
 	python setup.py test_on_postgres
