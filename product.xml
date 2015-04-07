@@ -3,12 +3,12 @@
     <data>
         <record model="ir.ui.view" id="attribute_view_list">
             <field name="model">product.attribute</field>
-            <field name="inherit" ref="product_attribute.attribute_view_list" />
+            <field name="inherit" ref="product_attribute_strict.attribute_view_list" />
             <field name="name">attribute_list</field>
         </record>
         <record model="ir.ui.view" id="attribute_view_form">
             <field name="model">product.attribute</field>
-            <field name="inherit" ref="product_attribute.attribute_view_form" />
+            <field name="inherit" ref="product_attribute_strict.attribute_view_form" />
             <field name="name">attribute_form</field>
         </record>
         <!-- Create a document for mapping products -->

@@ -16,7 +16,7 @@ from trytond.pyson import Eval, Bool
 from nereid import request, template_filter
 
 __metaclass__ = PoolMeta
-__all__ = ['Product', 'Template']
+__all__ = ['Product', 'Template', 'ProductAttribute']
 
 
 class Product:
@@ -69,17 +69,18 @@ class Product:
                 "true" if self.displayed_on_eshop else "false"
             ),
             'active': "true" if self.active else "false",
-            'attributes': self.get_elastic_filterable_data(),
+            'attributes': self.elastic_attributes_json(),
         }
 
-    def get_elastic_filterable_data(self):
+    def elastic_attributes_json(self):
         """
-        This method returns a dictionary of attributes which will be used to
-        filter search results. By default, it returns a product's attributes.
-        Downstream modules can override this method to add any other relevant
-        fields. This data is added to the index.
+        This method returns the filterable attributes of the product in a
+        <name>: <value> format for easy consumption by elasticsearch.
         """
-        return self.attributes
+        return dict([
+            (attribute.attribute.name, attribute.value) for attribute in
+            self.attributes
+        ])
 
     @classmethod
     def get_filterable_attributes(cls):

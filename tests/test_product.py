@@ -11,7 +11,6 @@ import datetime
 from dateutil.relativedelta import relativedelta
 from decimal import Decimal
 from pyes.managers import Indices
-from pyes import BoolQuery, MatchQuery
 
 import trytond.tests.test_tryton
 from trytond.tests.test_tryton import POOL, USER, DB_NAME, CONTEXT
@@ -386,18 +385,17 @@ class TestProduct(NereidTestCase):
             'currency': usd.id,
         }])
 
-        self.channel, = self.SaleChannel.create([{
-            'name': 'Default Channel',
-            'price_list': channel_price_list,
-            'warehouse': warehouse,
-            'currency': usd.id,
-            'payment_term': payment_term,
-            'company': self.company.id,
-            'create_users': [('add', [USER])],
-            'invoice_method': 'order',
-            'shipment_method': 'order',
-            'source': 'manual'
-        }])
+        with Transaction().set_context({'company': self.company.id}):
+            self.channel, = self.SaleChannel.create([{
+                'name': 'Default Channel',
+                'price_list': channel_price_list,
+                'warehouse': warehouse,
+                'payment_term': payment_term,
+                'create_users': [('add', [USER])],
+                'invoice_method': 'order',
+                'shipment_method': 'order',
+                'source': 'manual'
+            }])
         self.User.set_preferences({'current_channel': self.channel})
 
         self.User.write(
@@ -407,7 +405,6 @@ class TestProduct(NereidTestCase):
                 'current_channel': self.channel,
             }
         )
-
         self.default_node, = self.Node.create([{
             'name': 'root',
             'slug': 'root',
@@ -602,24 +599,38 @@ class TestProduct(NereidTestCase):
             attribute1, = self.ProductAttribute.create([{
                 'name': 'size',
                 'type_': 'selection',
-                'string': 'Size',
-                'selection': 'm: M\nl:L\nxl:XL'
+                'display_name': 'Size',
+                'selection': [
+                    ('create', [{
+                        'name': 'medium',
+                    }, {
+                        'name': 'large',
+                    }, {
+                        'name': 'extra_large',
+                    }])
+                ]
             }])
             attribute2, = self.ProductAttribute.create([{
                 'name': 'color',
                 'type_': 'selection',
-                'string': 'Color',
-                'selection': 'blue: Blue\nblack:Black'
+                'display_name': 'Color',
+                'selection': [
+                    ('create', [{
+                        'name': 'blue',
+                    }, {
+                        'name': 'black',
+                    }])
+                ]
             }])
             attribute3, = self.ProductAttribute.create([{
                 'name': 'attrib',
                 'type_': 'char',
-                'string': 'Attrib',
+                'display_name': 'Attrib',
             }])
             attribute4, = self.ProductAttribute.create([{
                 'name': 'ø',
                 'type_': 'char',
-                'string': 'ø',
+                'display_name': 'ø',
             }])
 
             # Create attribute set
@@ -627,7 +638,7 @@ class TestProduct(NereidTestCase):
                 'name': 'Cloth',
                 'attributes': [
                     ('add', [attribute1.id, attribute2.id, attribute4.id])
-                ]
+                ],
             }])
 
             # Create product template with attribute set
@@ -645,11 +656,18 @@ class TestProduct(NereidTestCase):
                 'displayed_on_eshop': True,
                 'uri': 'uri3',
                 'code': 'SomeProductCode',
-                'attributes': {
-                    'color': 'blue',
-                    'size': 'L',
-                    'ø': 'something'
-                }
+                'attributes': [
+                    ('create', [{
+                        'attribute': attribute1.id,
+                        'value_selection': attribute1.selection[0].id,
+                    }, {
+                        'attribute': attribute2.id,
+                        'value_selection': attribute2.selection[0].id,
+                    }, {
+                        'attribute': attribute4.id,
+                        'value_char': 'Test Char Value',
+                    }])
+                ],
             }])
 
             self.assertEqual(self.IndexBacklog.search([], count=True), 1)
@@ -659,123 +677,9 @@ class TestProduct(NereidTestCase):
 
             self.assertEqual(self.IndexBacklog.search([], count=True), 0)
 
-            # Try a simple query on the basis of product attributes.
-            conn = self.ElasticConfig(1).get_es_connection()
-
-            results = [
-                r.name for r in
-                conn.search(
-                    BoolQuery(
-                        should=[
-                            MatchQuery('attributes.color', 'blue')
-                        ]
-                    ),
-                    doc_types=[
-                        self.ElasticConfig(1).make_type_name('product.product')
-                    ],
-                    size=10
-                )
-            ]
-
-            self.assertTrue(product1.name in results)
-
             self.clear_server()
 
-    def test_0050_faceting(self):
-        """
-        Test that aggregations are being calculated on filterable attributes.
-        """
-        with Transaction().start(DB_NAME, USER, context=CONTEXT):
-            self.update_treenode_mapping()
-            self.setup_defaults()
-            app = self.get_app()
-
-            uom, = self.Uom.search([], limit=1)
-
-            # Create attributes
-            # By default, `filterable` is True.
-            attribute1, = self.ProductAttribute.create([{
-                'name': 'size',
-                'type_': 'selection',
-                'string': 'Size',
-                'selection': 'm: M\nl:L\nxl:XL'
-            }])
-            attribute2, = self.ProductAttribute.create([{
-                'name': 'color',
-                'type_': 'selection',
-                'string': 'Color',
-                'selection': 'blue: Blue\nblack:Black'
-            }])
-
-            # Create attribute set
-            attrib_set, = self.ProductAttributeSet.create([{
-                'name': 'Cloth',
-                'attributes': [
-                    ('add', [attribute1.id, attribute2.id, ])
-                ]
-            }])
-
-            # Create product template with attribute set
-            template1, = self.ProductTemplate.create([{
-                'name': 'This is Product',
-                'type': 'goods',
-                'list_price': Decimal('10'),
-                'cost_price': Decimal('5'),
-                'default_uom': uom.id,
-                'attribute_set': attrib_set.id,
-            }])
-
-            product1, = self.Product.create([{
-                'template': template1.id,
-                'displayed_on_eshop': True,
-                'uri': 'uri1',
-                'code': 'SomeProductCode1',
-                'attributes': {
-                    'size': 'XL',
-                }
-            }])
-
-            product2, = self.Product.create([{
-                'template': template1.id,
-                'displayed_on_eshop': True,
-                'uri': 'uri2',
-                'code': 'SomeProductCode2',
-                'attributes': {
-                    'color': 'black',
-                    'size': 'L',
-                }
-            }])
-
-            product3, = self.Product.create([{
-                'template': template1.id,
-                'displayed_on_eshop': True,
-                'uri': 'uri3',
-                'code': 'SomeProductCode3',
-                'attributes': {
-                    'color': 'blue',
-                }
-            }])
-
-            self.IndexBacklog.update_index()
-            time.sleep(2)
-
-            with app.test_request_context('/search?q=SomeProductCode'):
-                facets = self.NereidWebsite.quick_search().context['facets']
-                facets = self.Product.add_display_counts(facets)
-
-                self.assertGreater(
-                    len(facets['color']['terms']), 0
-                )
-                self.assertIn('display_count', facets['color'])
-
-                self.assertGreater(
-                    len(facets['size']['terms']), 0
-                )
-                self.assertIn('display_count', facets['size'])
-
-            self.clear_server()
-
-    def test_0055_filtering(self):
+    def test_0050_filtering(self):
         """
         Test whether filtering works.
         """
@@ -791,20 +695,40 @@ class TestProduct(NereidTestCase):
             attribute1, = self.ProductAttribute.create([{
                 'name': 'size',
                 'type_': 'selection',
-                'string': 'Size',
-                'selection': 'm: M\nl:L\nxl:XL'
+                'display_name': 'Size',
+                'selection': [
+                    ('create', [{
+                        'name': 'medium',
+                    }, {
+                        'name': 'large',
+                    }, {
+                        'name': 'extra_large',
+                    }])
+                ]
             }])
             attribute2, = self.ProductAttribute.create([{
                 'name': 'color',
                 'type_': 'selection',
-                'string': 'Color',
-                'selection': 'blue: Blue\nblack:Black'
+                'display_name': 'Color',
+                'selection': [
+                    ('create', [{
+                        'name': 'blue',
+                    }, {
+                        'name': 'black',
+                    }])
+                ]
             }])
             attribute3, = self.ProductAttribute.create([{
                 'name': 'medium',
                 'type_': 'selection',
-                'string': 'Medium',
-                'selection': 'digital: Digital\nphysical:Physical'
+                'display_name': 'Medium',
+                'selection': [
+                    ('create', [{
+                        'name': 'digital',
+                    }, {
+                        'name': 'physical',
+                    }])
+                ]
             }])
 
             # Create attribute set
@@ -830,10 +754,15 @@ class TestProduct(NereidTestCase):
                 'displayed_on_eshop': True,
                 'uri': 'uri1',
                 'code': 'SomeProductCode1',
-                'attributes': {
-                    'size': 'XL',
-                    'medium': 'digital',
-                }
+                'attributes': [
+                    ('create', [{
+                        'attribute': attribute1.id,  # size
+                        'value_selection': attribute1.selection[2].id,  # XL
+                    }, {
+                        'attribute': attribute3.id,  # medium
+                        'value_selection': attribute3.selection[0].id,  # digi
+                    }])
+                ],
             }])
 
             product2, = self.Product.create([{
@@ -841,11 +770,18 @@ class TestProduct(NereidTestCase):
                 'displayed_on_eshop': True,
                 'uri': 'uri2',
                 'code': 'SomeProductCode2',
-                'attributes': {
-                    'color': 'black',
-                    'size': 'L',
-                    'medium': 'digital',
-                }
+                'attributes': [
+                    ('create', [{
+                        'attribute': attribute2.id,  # color
+                        'value_selection': attribute2.selection[1].id,  # black
+                    }, {
+                        'attribute': attribute1.id,  # size
+                        'value_selection': attribute1.selection[1].id,  # large
+                    }, {
+                        'attribute': attribute3.id,  # medium
+                        'value_selection': attribute3.selection[0].id,  # digi
+                    }])
+                ],
             }])
 
             product3, = self.Product.create([{
@@ -853,10 +789,15 @@ class TestProduct(NereidTestCase):
                 'displayed_on_eshop': True,
                 'uri': 'uri3',
                 'code': 'SomeProductCode3',
-                'attributes': {
-                    'color': 'blue',
-                    'medium': 'physical',
-                }
+                'attributes': [
+                    ('create', [{
+                        'attribute': attribute2.id,  # color
+                        'value_selection': attribute2.selection[0].id,  # blue
+                    }, {
+                        'attribute': attribute3.id,  # medium
+                        'value_selection': attribute3.selection[1].id,  # phys
+                    }])
+                ],
             }])
 
             self.IndexBacklog.update_index()
@@ -895,6 +836,7 @@ class TestProduct(NereidTestCase):
             # First, no filtering case.
             with app.test_request_context('/search?q=product'):
                 facets = self.NereidWebsite.quick_search().context['facets']
+
                 self.assertItemsEqual(
                     facets['color']['terms'],
                     [
@@ -912,8 +854,8 @@ class TestProduct(NereidTestCase):
                 self.assertItemsEqual(
                     facets['size']['terms'],
                     [
-                        {'count': 1, 'term': 'XL'},
-                        {'count': 1, 'term': 'L'},
+                        {'count': 1, 'term': 'extra_large'},
+                        {'count': 1, 'term': 'large'},
                     ]
                 )
 
@@ -937,8 +879,8 @@ class TestProduct(NereidTestCase):
                 self.assertItemsEqual(
                     facets['size']['terms'],
                     [
-                        {'count': 1, 'term': 'L'},
-                        {'count': 0, 'term': 'XL'},
+                        {'count': 1, 'term': 'large'},
+                        {'count': 0, 'term': 'extra_large'},
                     ]
                 )
 
