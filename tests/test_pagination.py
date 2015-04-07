@@ -290,7 +290,6 @@ class TestPagination(NereidTestCase):
                 'current_channel': self.channel,
             }
         )
-
         self.default_node, = self.Node.create([{
             'name': 'root',
             'slug': 'root',
