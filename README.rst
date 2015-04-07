@@ -14,6 +14,15 @@ nereid-webshop-elastic-search
     :target: https://pypi.python.org/pypi/openlabs_nereid_webshop_elastic_search/
     :alt: Development Status
 
+Migration to 3.4
+----------------
+
+In version 3.4, the module changed from using ``product_attribute`` core
+module from tryton community to `product_attribute_strict 
+<https://github.com/openlabs/product-attribute-strict>`_. The
+``product_attribute_strict`` module includes a script which helps to
+migrate from ``product_attribute`` transparently.
+
 Authors and Contributors
 ------------------------
 
