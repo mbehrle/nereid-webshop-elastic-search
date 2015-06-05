@@ -334,6 +334,8 @@ class Product:
         ):
             results.append(
                 {
+                    "id": product.id,
+                    "type": product.type,
                     "display_name": product.name,
                     "url": cls(product.id).get_absolute_url(
                         _external=True
