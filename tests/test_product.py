@@ -394,7 +394,7 @@ class TestProduct(NereidTestCase):
                 'create_users': [('add', [USER])],
                 'invoice_method': 'order',
                 'shipment_method': 'order',
-                'source': 'manual'
+                'source': 'webshop'
             }])
         self.User.set_preferences({'current_channel': self.channel})
 
@@ -519,12 +519,16 @@ class TestProduct(NereidTestCase):
                     'url': self.template1.products[0].get_absolute_url(
                         _external=True
                     ),
+                    'id': self.template1.products[0].id,
+                    'type': self.template1.type,
                 }, results)
                 self.assertIn({
                     'display_name': self.template2.name,
                     'url': self.template2.products[0].get_absolute_url(
                         _external=True
                     ),
+                    'id': self.template2.products[0].id,
+                    'type': self.template2.type,
                 }, results)
 
             self.clear_server()
