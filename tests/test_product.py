@@ -515,7 +515,9 @@ class TestProduct(NereidTestCase):
                 results = self.NereidWebsite.auto_complete('product')
 
                 self.assertIn({
-                    'display_name': self.template1.name,
+                    'display_name': '%s - %s' % (
+                        self.template1.products[0].code, self.template1.name
+                    ),
                     'url': self.template1.products[0].get_absolute_url(
                         _external=True
                     ),
@@ -523,7 +525,9 @@ class TestProduct(NereidTestCase):
                     'type': self.template1.type,
                 }, results)
                 self.assertIn({
-                    'display_name': self.template2.name,
+                    'display_name': '%s - %s' % (
+                        self.template2.products[0].code, self.template2.name
+                    ),
                     'url': self.template2.products[0].get_absolute_url(
                         _external=True
                     ),
