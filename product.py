@@ -332,11 +332,14 @@ class Product:
             doc_types=[config.make_type_name('product.product')],
             size=5
         ):
+            display_name = product.name
+            if product.code:
+                display_name = '%s - %s' % (product.code, display_name)
             results.append(
                 {
                     "id": product.id,
                     "type": product.type,
-                    "display_name": product.name,
+                    "display_name": display_name,
                     "url": cls(product.id).get_absolute_url(
                         _external=True
                     ),
