@@ -27,7 +27,7 @@ class Website:
 
         if not config.get_es_connection(timeout=5):
             # NO ES fallback to default search
-            return super(Website, cls).auto_complete()
+            return super(Website, cls).auto_complete(phrase)
 
         return Product._es_autocomplete(phrase)
 
