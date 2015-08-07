@@ -23,6 +23,11 @@ class Website:
         results for a query.
         """
         Product = Pool().get('product.product')
+        config = Pool().get('elasticsearch.configuration')(1)
+
+        if not config.get_es_connection(timeout=5):
+            # NO ES fallback to default search
+            return super(Website, cls).auto_complete()
 
         return Product._es_autocomplete(phrase)
 
@@ -34,6 +39,11 @@ class Website:
         search results for searches from the website.
         """
         Product = Pool().get('product.product')
+        config = Pool().get('elasticsearch.configuration')(1)
+
+        if not config.get_es_connection(timeout=5):
+            # NO ES fallback to default search
+            return super(Website, cls).quick_search()
 
         page = request.args.get('page', 1, type=int)
         phrase = request.args.get('q', '')
