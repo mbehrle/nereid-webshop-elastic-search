@@ -77,7 +77,7 @@ minor_version = int(minor_version)
 requires = []
 
 MODULE2PREFIX = {
-    'nereid_webshop': 'openlabs',
+    'nereid_webshop': 'fio',
     'product_attribute_strict': 'openlabs',
 }
 
