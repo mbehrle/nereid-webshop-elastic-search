@@ -20,6 +20,26 @@ __all__ = ['Product', 'Template', 'ProductAttribute']
 class Product:
     __name__ = 'product.product'
 
+    @classmethod
+    def create(cls, vlist):
+        """Create a record in elastic search on create
+        :param vlist: List of dictionaries of fields with values
+        """
+        IndexBacklog = Pool().get('elasticsearch.index_backlog')
+
+        products = super(Product, cls).create(vlist)
+        IndexBacklog.create_from_records(products)
+        return products
+
+    @classmethod
+    def write(cls, products, values, *args):
+        """Create a record in elastic search on write
+        """
+        IndexBacklog = Pool().get('elasticsearch.index_backlog')
+        rv = super(Product, cls).write(products, values, *args)
+        IndexBacklog.create_from_records(products)
+        return rv
+
     def elastic_search_json(self):
         """
         Return a JSON serializable dictionary
@@ -290,7 +310,6 @@ class Product:
         es_filter = cls._build_es_filter(
             filterable_attributes=filterable_attributes
         )
-
         # Generate the `~pyes.query.Query` object.
         query = cls._build_es_query(search_phrase)
 
