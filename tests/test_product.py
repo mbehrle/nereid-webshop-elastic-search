@@ -11,7 +11,7 @@ from decimal import Decimal
 from pyes.managers import Indices
 
 import trytond.tests.test_tryton
-from trytond.tests.test_tryton import POOL, USER, DB_NAME, CONTEXT
+from trytond.tests.test_tryton import POOL, USER, CONTEXT, with_transaction
 from trytond.transaction import Transaction
 from nereid.testing import NereidTestCase
 
@@ -80,7 +80,7 @@ class TestProduct(NereidTestCase):
                 {
                     'name': 'Prøduçt 1 ünîçø∂e',
                     'type': 'goods',
-                    'category': category.id,
+                    'categories': [('add', [category.id])],
                     'default_uom': uom.id,
                     'description': 'This is product 1',
                     'list_price': 5000,
@@ -89,7 +89,7 @@ class TestProduct(NereidTestCase):
                 {
                     'name': 'Product 2',
                     'type': 'goods',
-                    'category': category.id,
+                    'categories': [('add', [category.id])],
                     'default_uom': uom.id,
                     'description': 'This is product 2',
                     'list_price': 3000,
@@ -98,7 +98,7 @@ class TestProduct(NereidTestCase):
                 {
                     'name': 'ActiveProduct',
                     'type': 'goods',
-                    'category': category.id,
+                    'categories': [('add', [category.id])],
                     'default_uom': uom.id,
                     'description':
                         'This is product for active testing',
@@ -108,7 +108,7 @@ class TestProduct(NereidTestCase):
                 {
                     'name': 'DisplayProduct',
                     'type': 'goods',
-                    'category': category.id,
+                    'categories': [('add', [category.id])],
                     'default_uom': uom.id,
                     'description': 'This is product for e-shop display testing',
                     'list_price': 3000,
@@ -117,7 +117,7 @@ class TestProduct(NereidTestCase):
                 {
                     'name': 'InactiveProduct',
                     'type': 'goods',
-                    'category': category.id,
+                    'categories': [('add', [category.id])],
                     'default_uom': uom.id,
                     'description': 'This is product for inactive testing',
                     'list_price': 3000,
@@ -126,7 +126,7 @@ class TestProduct(NereidTestCase):
                 {
                     'name': 'NotDisplayProduct',
                     'type': 'goods',
-                    'category': category.id,
+                    'categories': [('add', [category.id])],
                     'default_uom': uom.id,
                     'description': 'This is product for non-display testing',
                     'list_price': 3000,
@@ -217,9 +217,10 @@ class TestProduct(NereidTestCase):
         account_create_chart = POOL.get(
             'account.create_chart', type="wizard")
 
-        account_template, = AccountTemplate.search(
-            [('parent', '=', None)]
-        )
+        account_template, = AccountTemplate.search([
+            ('parent', '=', None),
+            ('name', '=', 'Minimal Account Chart')
+        ])
 
         session_id, _, _ = account_create_chart.create()
         create_chart = account_create_chart(session_id)
@@ -446,449 +447,449 @@ class TestProduct(NereidTestCase):
         self.ElasticConfig.update_settings([self.ElasticConfig(1)])
         self.ElasticDocumentType.update_mapping([product_doc])
 
+    @with_transaction()
     def test_0010_test_product_indexing(self):
         """
         Tests indexing on creation and updation of product
         """
-        with Transaction().start(DB_NAME, USER, context=CONTEXT):
-            self.update_treenode_mapping()
-            self.setup_defaults()
+        self.update_treenode_mapping()
+        self.setup_defaults()
 
-            category_automobile, = self.ProductCategory.create([{
-                'name': 'Automobile',
-            }])
-            uom, = self.Uom.search([('symbol', '=', 'u')])
+        category_automobile, = self.ProductCategory.create([{
+            'name': 'Automobile',
+        }])
+        uom, = self.Uom.search([('symbol', '=', 'u')])
 
-            template, = self.ProductTemplate.create([{
-                'name': 'Bat Mobile',
-                'type': 'goods',
-                'list_price': 50000,
-                'cost_price': 40000,
-                'category': category_automobile.id,
-                'default_uom': uom.id,
-            }])
-            product, = self.Product.create([{
-                'template': template,
-                'code': 'Batman has a code',
-                'use_template_description': False,
-                'description': 'This is the BatMobile',
-            }])
-            self.assertEqual(self.IndexBacklog.search([], count=True), 1)
-            # Clear backlog list
-            self.IndexBacklog.delete(self.IndexBacklog.search([]))
-            self.assertEqual(self.IndexBacklog.search([], count=True), 0)
-            # Update the product
-            self.ProductTemplate.write([product], {
-                'description': "Batman's ride",
-            })
-            self.assertEqual(self.IndexBacklog.search([], count=True), 1)
+        template, = self.ProductTemplate.create([{
+            'name': 'Bat Mobile',
+            'type': 'goods',
+            'list_price': 50000,
+            'cost_price': 40000,
+            'categories': [('add', [category_automobile.id])],
+            'default_uom': uom.id,
+        }])
+        product, = self.Product.create([{
+            'template': template,
+            'code': 'Batman has a code',
+            'use_template_description': False,
+            'description': 'This is the BatMobile',
+        }])
+        self.assertEqual(self.IndexBacklog.search([], count=True), 1)
+        # Clear backlog list
+        self.IndexBacklog.delete(self.IndexBacklog.search([]))
+        self.assertEqual(self.IndexBacklog.search([], count=True), 0)
+        # Update the product
+        self.Product.write([product], {
+            'description': "Batman's ride",
+        })
+        self.assertEqual(self.IndexBacklog.search([], count=True), 1)
 
-            # Create new products
-            self.create_products()
+        # Create new products
+        self.create_products()
 
-            # Update index on Elastic-Search server
-            self.IndexBacklog.update_index()
-            time.sleep(2)
+        # Update index on Elastic-Search server
+        self.IndexBacklog.update_index()
+        time.sleep(2)
 
-            # Test if new records have been uploaded on elastic server
-            # If Index Backlog if empty, it means the records got updated
-            self.assertEqual(self.IndexBacklog.search([], count=True), 0)
+        # Test if new records have been uploaded on elastic server
+        # If Index Backlog if empty, it means the records got updated
+        self.assertEqual(self.IndexBacklog.search([], count=True), 0)
 
-            self.clear_server()
+        self.clear_server()
 
+    @with_transaction()
     def test_0020_autocomplete(self):
         """
         Tests the custom autocomplete classmethod
         """
-        with Transaction().start(DB_NAME, USER, context=CONTEXT):
-            self.update_treenode_mapping()
-            self.setup_defaults()
-            self.create_products()
-            app = self.get_app()
+        self.update_treenode_mapping()
+        self.setup_defaults()
+        self.create_products()
+        app = self.get_app()
 
-            self.IndexBacklog.update_index()
-            time.sleep(5)
+        self.IndexBacklog.update_index()
+        time.sleep(5)
 
-            with app.test_request_context('/'):
-                results = self.NereidWebsite.auto_complete('product')
+        with app.test_request_context('/'):
+            results = self.NereidWebsite.auto_complete('product')
 
-                self.assertIn({
-                    'display_name': '%s - %s' % (
-                        self.template1.products[0].code, self.template1.name
-                    ),
-                    'url': self.template1.products[0].get_absolute_url(
-                        _external=True
-                    ),
-                    'id': self.template1.products[0].id,
-                    'type': self.template1.type,
-                }, results)
-                self.assertIn({
-                    'display_name': '%s - %s' % (
-                        self.template2.products[0].code, self.template2.name
-                    ),
-                    'url': self.template2.products[0].get_absolute_url(
-                        _external=True
-                    ),
-                    'id': self.template2.products[0].id,
-                    'type': self.template2.type,
-                }, results)
+            self.assertIn({
+                'display_name': '%s - %s' % (
+                    self.template1.products[0].code, self.template1.name
+                ),
+                'url': self.template1.products[0].get_absolute_url(
+                    _external=True
+                ),
+                'id': self.template1.products[0].id,
+                'type': self.template1.type,
+            }, results)
+            self.assertIn({
+                'display_name': '%s - %s' % (
+                    self.template2.products[0].code, self.template2.name
+                ),
+                'url': self.template2.products[0].get_absolute_url(
+                    _external=True
+                ),
+                'id': self.template2.products[0].id,
+                'type': self.template2.type,
+            }, results)
 
-            self.clear_server()
+        self.clear_server()
 
+    @with_transaction()
     def test_0030_product_active_eshop(self):
         """
         Tests for active/inactive and e-shop displayed/hidden products.
         """
-        with Transaction().start(DB_NAME, USER, context=CONTEXT):
-            self.update_treenode_mapping()
-            self.setup_defaults()
-            self.create_products()
-            self.IndexBacklog.update_index()
-            time.sleep(5)
-            app = self.get_app()
+        self.update_treenode_mapping()
+        self.setup_defaults()
+        self.create_products()
+        self.IndexBacklog.update_index()
+        time.sleep(5)
+        app = self.get_app()
 
-            with app.test_client() as c:
-                rv = c.get('/search?q=active')
-                self.assertIn('Active', rv.data.decode('UTF-8'))
+        with app.test_client() as c:
+            rv = c.get('/search?q=active')
+            self.assertIn('Active', rv.data.decode('UTF-8'))
 
-                rv = c.get('/search?q=inactive')
-                self.assertNotIn('Inactive', rv.data.decode('UTF-8'))
+            rv = c.get('/search?q=inactive')
+            self.assertNotIn('Inactive', rv.data.decode('UTF-8'))
 
-                rv = c.get('/search?q=display')
-                self.assertIn('Display', rv.data.decode('UTF-8'))
+            rv = c.get('/search?q=display')
+            self.assertIn('Display', rv.data.decode('UTF-8'))
 
-                rv = c.get('/search?q=notdisplay')
-                self.assertNotIn('NotDisplay', rv.data.decode('UTF-8'))
+            rv = c.get('/search?q=notdisplay')
+            self.assertNotIn('NotDisplay', rv.data.decode('UTF-8'))
 
-            self.clear_server()
+        self.clear_server()
 
+    @with_transaction()
     def test_0035_search(self):
         """
         Tests product search via elastic search
         """
-        with Transaction().start(DB_NAME, USER, context=CONTEXT):
-            self.update_treenode_mapping()
-            self.setup_defaults()
-            self.create_products()
-            self.IndexBacklog.update_index()
-            time.sleep(5)
-            app = self.get_app()
+        self.update_treenode_mapping()
+        self.setup_defaults()
+        self.create_products()
+        self.IndexBacklog.update_index()
+        time.sleep(5)
+        app = self.get_app()
 
-            with app.test_client() as c:
-                rv = c.get('/search?q=product')
-                self.assertTrue(self.template2.name in rv.data.decode('UTF-8'))
+        with app.test_client() as c:
+            rv = c.get('/search?q=product')
+            self.assertTrue(self.template2.name in rv.data.decode('UTF-8'))
 
-                rv = c.get('/search?q=test category')
-                result = rv.data.decode('UTF-8')
-                self.assertTrue(self.template2.name in result)
-                self.assertTrue(self.template3.name in result)
-                self.assertTrue(self.template4.name in result)
+            rv = c.get('/search?q=test category')
+            result = rv.data.decode('UTF-8')
+            self.assertTrue(self.template2.name in result)
+            self.assertTrue(self.template3.name in result)
+            self.assertTrue(self.template4.name in result)
 
-                rv = c.get('/search?q=prøduçt 1 ünîçø∂e')
-                self.assertTrue(
-                    self.template1.name in rv.data.decode('UTF-8')
-                )
+            rv = c.get('/search?q=prøduçt 1 ünîçø∂e')
+            self.assertTrue(
+                self.template1.name in rv.data.decode('UTF-8')
+            )
 
-            self.clear_server()
+        self.clear_server()
 
+    @with_transaction()
     def test_0045_product_attributes_indexing(self):
         """
         Test that product attributes are being indexed
         """
-        with Transaction().start(DB_NAME, USER, context=CONTEXT):
-            self.update_treenode_mapping()
-            self.setup_defaults()
+        self.update_treenode_mapping()
+        self.setup_defaults()
 
-            uom, = self.Uom.search([], limit=1)
+        uom, = self.Uom.search([], limit=1)
 
-            # Create attributes
-            attribute1, = self.ProductAttribute.create([{
-                'name': 'size',
-                'type_': 'selection',
-                'display_name': 'Size',
-                'selection': [
-                    ('create', [{
-                        'name': 'medium',
-                    }, {
-                        'name': 'large',
-                    }, {
-                        'name': 'extra_large',
-                    }])
-                ]
-            }])
-            attribute2, = self.ProductAttribute.create([{
-                'name': 'color',
-                'type_': 'selection',
-                'display_name': 'Color',
-                'selection': [
-                    ('create', [{
-                        'name': 'blue',
-                    }, {
-                        'name': 'black',
-                    }])
-                ]
-            }])
-            attribute3, = self.ProductAttribute.create([{
-                'name': 'attrib',
-                'type_': 'char',
-                'display_name': 'Attrib',
-            }])
-            attribute4, = self.ProductAttribute.create([{
-                'name': 'ø',
-                'type_': 'char',
-                'display_name': 'ø',
-            }])
+        # Create attributes
+        attribute1, = self.ProductAttribute.create([{
+            'name': 'size',
+            'type_': 'selection',
+            'display_name': 'Size',
+            'selection': [
+                ('create', [{
+                    'name': 'medium',
+                }, {
+                    'name': 'large',
+                }, {
+                    'name': 'extra_large',
+                }])
+            ]
+        }])
+        attribute2, = self.ProductAttribute.create([{
+            'name': 'color',
+            'type_': 'selection',
+            'display_name': 'Color',
+            'selection': [
+                ('create', [{
+                    'name': 'blue',
+                }, {
+                    'name': 'black',
+                }])
+            ]
+        }])
+        attribute3, = self.ProductAttribute.create([{
+            'name': 'attrib',
+            'type_': 'char',
+            'display_name': 'Attrib',
+        }])
+        attribute4, = self.ProductAttribute.create([{
+            'name': 'ø',
+            'type_': 'char',
+            'display_name': 'ø',
+        }])
 
-            # Create attribute set
-            attrib_set, = self.ProductAttributeSet.create([{
-                'name': 'Cloth',
-                'attributes': [
-                    ('add', [attribute1.id, attribute2.id, attribute4.id])
-                ],
-            }])
+        # Create attribute set
+        attrib_set, = self.ProductAttributeSet.create([{
+            'name': 'Cloth',
+            'attributes': [
+                ('add', [attribute1.id, attribute2.id, attribute4.id])
+            ],
+        }])
 
-            # Create product template with attribute set
-            template1, = self.ProductTemplate.create([{
-                'name': 'This is Product',
-                'type': 'goods',
-                'list_price': Decimal('10'),
-                'cost_price': Decimal('5'),
-                'default_uom': uom.id,
-                'attribute_set': attrib_set.id,
-            }])
+        # Create product template with attribute set
+        template1, = self.ProductTemplate.create([{
+            'name': 'This is Product',
+            'type': 'goods',
+            'list_price': Decimal('10'),
+            'cost_price': Decimal('5'),
+            'default_uom': uom.id,
+            'attribute_set': attrib_set.id,
+        }])
 
-            product1, = self.Product.create([{
-                'template': template1.id,
-                'displayed_on_eshop': True,
-                'uri': 'uri3',
-                'code': 'SomeProductCode',
-                'attributes': [
-                    ('create', [{
-                        'attribute': attribute1.id,
-                        'value_selection': attribute1.selection[0].id,
-                    }, {
-                        'attribute': attribute2.id,
-                        'value_selection': attribute2.selection[0].id,
-                    }, {
-                        'attribute': attribute4.id,
-                        'value_char': 'Test Char Value',
-                    }])
-                ],
-            }])
+        product1, = self.Product.create([{
+            'template': template1.id,
+            'displayed_on_eshop': True,
+            'uri': 'uri3',
+            'code': 'SomeProductCode',
+            'attributes': [
+                ('create', [{
+                    'attribute': attribute1.id,
+                    'value_selection': attribute1.selection[0].id,
+                }, {
+                    'attribute': attribute2.id,
+                    'value_selection': attribute2.selection[0].id,
+                }, {
+                    'attribute': attribute4.id,
+                    'value_char': 'Test Char Value',
+                }])
+            ],
+        }])
 
-            self.assertEqual(self.IndexBacklog.search([], count=True), 1)
+        self.assertEqual(self.IndexBacklog.search([], count=True), 1)
 
-            self.IndexBacklog.update_index()
-            time.sleep(2)
+        self.IndexBacklog.update_index()
+        time.sleep(2)
 
-            self.assertEqual(self.IndexBacklog.search([], count=True), 0)
+        self.assertEqual(self.IndexBacklog.search([], count=True), 0)
 
-            self.clear_server()
+        self.clear_server()
 
+    @with_transaction()
     def test_0050_filtering(self):
         """
         Test whether filtering works.
         """
-        with Transaction().start(DB_NAME, USER, context=CONTEXT):
-            self.update_treenode_mapping()
-            self.setup_defaults()
-            app = self.get_app()
+        self.update_treenode_mapping()
+        self.setup_defaults()
+        app = self.get_app()
 
-            uom, = self.Uom.search([], limit=1)
+        uom, = self.Uom.search([], limit=1)
 
-            # Create attributes
-            # By default, `filterable` is True.
-            attribute1, = self.ProductAttribute.create([{
-                'name': 'size',
-                'type_': 'selection',
-                'display_name': 'Size',
-                'selection': [
-                    ('create', [{
-                        'name': 'medium',
-                    }, {
-                        'name': 'large',
-                    }, {
-                        'name': 'extra_large',
-                    }])
+        # Create attributes
+        # By default, `filterable` is True.
+        attribute1, = self.ProductAttribute.create([{
+            'name': 'size',
+            'type_': 'selection',
+            'display_name': 'Size',
+            'selection': [
+                ('create', [{
+                    'name': 'medium',
+                }, {
+                    'name': 'large',
+                }, {
+                    'name': 'extra_large',
+                }])
+            ]
+        }])
+        attribute2, = self.ProductAttribute.create([{
+            'name': 'color',
+            'type_': 'selection',
+            'display_name': 'Color',
+            'selection': [
+                ('create', [{
+                    'name': 'blue',
+                }, {
+                    'name': 'black',
+                }])
+            ]
+        }])
+        attribute3, = self.ProductAttribute.create([{
+            'name': 'medium',
+            'type_': 'selection',
+            'display_name': 'Medium',
+            'selection': [
+                ('create', [{
+                    'name': 'digital',
+                }, {
+                    'name': 'physical',
+                }])
+            ]
+        }])
+
+        # Create attribute set
+        attrib_set, = self.ProductAttributeSet.create([{
+            'name': 'Cloth',
+            'attributes': [
+                ('add', [attribute1.id, attribute2.id, attribute3.id])
+            ]
+        }])
+
+        # Create product template with attribute set
+        template1, = self.ProductTemplate.create([{
+            'name': 'This is Product',
+            'type': 'goods',
+            'list_price': Decimal('10'),
+            'cost_price': Decimal('5'),
+            'default_uom': uom.id,
+            'attribute_set': attrib_set.id,
+        }])
+
+        product1, = self.Product.create([{
+            'template': template1.id,
+            'displayed_on_eshop': True,
+            'uri': 'uri1',
+            'code': 'SomeProductCode1',
+            'attributes': [
+                ('create', [{
+                    'attribute': attribute1.id,  # size
+                    'value_selection': attribute1.selection[2].id,  # XL
+                }, {
+                    'attribute': attribute3.id,  # medium
+                    'value_selection': attribute3.selection[0].id,  # digi
+                }])
+            ],
+        }])
+
+        product2, = self.Product.create([{
+            'template': template1.id,
+            'displayed_on_eshop': True,
+            'uri': 'uri2',
+            'code': 'SomeProductCode2',
+            'attributes': [
+                ('create', [{
+                    'attribute': attribute2.id,  # color
+                    'value_selection': attribute2.selection[1].id,  # black
+                }, {
+                    'attribute': attribute1.id,  # size
+                    'value_selection': attribute1.selection[1].id,  # large
+                }, {
+                    'attribute': attribute3.id,  # medium
+                    'value_selection': attribute3.selection[0].id,  # digi
+                }])
+            ],
+        }])
+
+        product3, = self.Product.create([{
+            'template': template1.id,
+            'displayed_on_eshop': True,
+            'uri': 'uri3',
+            'code': 'SomeProductCode3',
+            'attributes': [
+                ('create', [{
+                    'attribute': attribute2.id,  # color
+                    'value_selection': attribute2.selection[0].id,  # blue
+                }, {
+                    'attribute': attribute3.id,  # medium
+                    'value_selection': attribute3.selection[1].id,  # phys
+                }])
+            ],
+        }])
+
+        self.IndexBacklog.update_index()
+        time.sleep(2)
+
+        with app.test_client() as c:
+            # No result search
+            rv = c.get('/search?q=NotHere&color=black&size=xl')
+            self.assertEqual(rv.data.strip(), '')
+
+            # Color should be black
+            rv = c.get('/search?q=product&color=black')
+            self.assertTrue(product2.code in rv.data)
+            self.assertFalse(product3.code in rv.data)
+
+            # Color could be blue or black
+            rv = c.get('/search?q=product&color=blue&color=black')
+            self.assertTrue(product2.code in rv.data)
+            self.assertTrue(product3.code in rv.data)
+
+            # Color should be blue or black and the medium should be
+            # physical
+            rv = c.get(
+                '/search?q=product&color=blue&color=black&medium=physical'
+            )
+            self.assertTrue(product3.code in rv.data)
+            self.assertFalse(product1.code in rv.data)
+            self.assertFalse(product2.code in rv.data)
+
+            # Medium should be digital
+            rv = c.get('/search?q=product&medium=digital')
+            self.assertTrue(product1.code in rv.data)
+            self.assertTrue(product2.code in rv.data)
+
+        # Now test that the facet tallies get updated due to filtering.
+        # First, no filtering case.
+        with app.test_request_context('/search?q=product'):
+            facets = self.NereidWebsite.quick_search().context['facets']
+
+            self.assertItemsEqual(
+                facets['color']['terms'],
+                [
+                    {'count': 1, 'term': 'blue'},
+                    {'count': 1, 'term': 'black'}
                 ]
-            }])
-            attribute2, = self.ProductAttribute.create([{
-                'name': 'color',
-                'type_': 'selection',
-                'display_name': 'Color',
-                'selection': [
-                    ('create', [{
-                        'name': 'blue',
-                    }, {
-                        'name': 'black',
-                    }])
+            )
+            self.assertItemsEqual(
+                facets['medium']['terms'],
+                [
+                    {'count': 2, 'term': 'digital'},
+                    {'count': 1, 'term': 'physical'}
                 ]
-            }])
-            attribute3, = self.ProductAttribute.create([{
-                'name': 'medium',
-                'type_': 'selection',
-                'display_name': 'Medium',
-                'selection': [
-                    ('create', [{
-                        'name': 'digital',
-                    }, {
-                        'name': 'physical',
-                    }])
+            )
+            self.assertItemsEqual(
+                facets['size']['terms'],
+                [
+                    {'count': 1, 'term': 'extra_large'},
+                    {'count': 1, 'term': 'large'},
                 ]
-            }])
+            )
 
-            # Create attribute set
-            attrib_set, = self.ProductAttributeSet.create([{
-                'name': 'Cloth',
-                'attributes': [
-                    ('add', [attribute1.id, attribute2.id, attribute3.id])
+        # Apply a filter.
+        with app.test_request_context('/search?q=product&color=black'):
+            facets = self.NereidWebsite.quick_search().context['facets']
+            self.assertItemsEqual(
+                facets['color']['terms'],
+                [
+                    {'count': 1, 'term': 'black'},
+                    {'count': 0, 'term': 'blue'},
                 ]
-            }])
-
-            # Create product template with attribute set
-            template1, = self.ProductTemplate.create([{
-                'name': 'This is Product',
-                'type': 'goods',
-                'list_price': Decimal('10'),
-                'cost_price': Decimal('5'),
-                'default_uom': uom.id,
-                'attribute_set': attrib_set.id,
-            }])
-
-            product1, = self.Product.create([{
-                'template': template1.id,
-                'displayed_on_eshop': True,
-                'uri': 'uri1',
-                'code': 'SomeProductCode1',
-                'attributes': [
-                    ('create', [{
-                        'attribute': attribute1.id,  # size
-                        'value_selection': attribute1.selection[2].id,  # XL
-                    }, {
-                        'attribute': attribute3.id,  # medium
-                        'value_selection': attribute3.selection[0].id,  # digi
-                    }])
-                ],
-            }])
-
-            product2, = self.Product.create([{
-                'template': template1.id,
-                'displayed_on_eshop': True,
-                'uri': 'uri2',
-                'code': 'SomeProductCode2',
-                'attributes': [
-                    ('create', [{
-                        'attribute': attribute2.id,  # color
-                        'value_selection': attribute2.selection[1].id,  # black
-                    }, {
-                        'attribute': attribute1.id,  # size
-                        'value_selection': attribute1.selection[1].id,  # large
-                    }, {
-                        'attribute': attribute3.id,  # medium
-                        'value_selection': attribute3.selection[0].id,  # digi
-                    }])
-                ],
-            }])
-
-            product3, = self.Product.create([{
-                'template': template1.id,
-                'displayed_on_eshop': True,
-                'uri': 'uri3',
-                'code': 'SomeProductCode3',
-                'attributes': [
-                    ('create', [{
-                        'attribute': attribute2.id,  # color
-                        'value_selection': attribute2.selection[0].id,  # blue
-                    }, {
-                        'attribute': attribute3.id,  # medium
-                        'value_selection': attribute3.selection[1].id,  # phys
-                    }])
-                ],
-            }])
-
-            self.IndexBacklog.update_index()
-            time.sleep(2)
-
-            with app.test_client() as c:
-                # No result search
-                rv = c.get('/search?q=NotHere&color=black&size=xl')
-                self.assertEqual(rv.data.strip(), '')
-
-                # Color should be black
-                rv = c.get('/search?q=product&color=black')
-                self.assertTrue(product2.code in rv.data)
-                self.assertFalse(product3.code in rv.data)
-
-                # Color could be blue or black
-                rv = c.get('/search?q=product&color=blue&color=black')
-                self.assertTrue(product2.code in rv.data)
-                self.assertTrue(product3.code in rv.data)
-
-                # Color should be blue or black and the medium should be
-                # physical
-                rv = c.get(
-                    '/search?q=product&color=blue&color=black&medium=physical'
-                )
-                self.assertTrue(product3.code in rv.data)
-                self.assertFalse(product1.code in rv.data)
-                self.assertFalse(product2.code in rv.data)
-
-                # Medium should be digital
-                rv = c.get('/search?q=product&medium=digital')
-                self.assertTrue(product1.code in rv.data)
-                self.assertTrue(product2.code in rv.data)
-
-            # Now test that the facet tallies get updated due to filtering.
-            # First, no filtering case.
-            with app.test_request_context('/search?q=product'):
-                facets = self.NereidWebsite.quick_search().context['facets']
-
-                self.assertItemsEqual(
-                    facets['color']['terms'],
-                    [
-                        {'count': 1, 'term': 'blue'},
-                        {'count': 1, 'term': 'black'}
-                    ]
-                )
-                self.assertItemsEqual(
-                    facets['medium']['terms'],
-                    [
-                        {'count': 2, 'term': 'digital'},
-                        {'count': 1, 'term': 'physical'}
-                    ]
-                )
-                self.assertItemsEqual(
-                    facets['size']['terms'],
-                    [
-                        {'count': 1, 'term': 'extra_large'},
-                        {'count': 1, 'term': 'large'},
-                    ]
-                )
-
-            # Apply a filter.
-            with app.test_request_context('/search?q=product&color=black'):
-                facets = self.NereidWebsite.quick_search().context['facets']
-                self.assertItemsEqual(
-                    facets['color']['terms'],
-                    [
-                        {'count': 1, 'term': 'black'},
-                        {'count': 0, 'term': 'blue'},
-                    ]
-                )
-                self.assertItemsEqual(
-                    facets['medium']['terms'],
-                    [
-                        {'count': 1, 'term': 'digital'},
-                        {'count': 0, 'term': 'physical'},
-                    ]
-                )
-                self.assertItemsEqual(
-                    facets['size']['terms'],
-                    [
-                        {'count': 1, 'term': 'large'},
-                        {'count': 0, 'term': 'extra_large'},
-                    ]
-                )
+            )
+            self.assertItemsEqual(
+                facets['medium']['terms'],
+                [
+                    {'count': 1, 'term': 'digital'},
+                    {'count': 0, 'term': 'physical'},
+                ]
+            )
+            self.assertItemsEqual(
+                facets['size']['terms'],
+                [
+                    {'count': 1, 'term': 'large'},
+                    {'count': 0, 'term': 'extra_large'},
+                ]
+            )
 
 
 def suite():

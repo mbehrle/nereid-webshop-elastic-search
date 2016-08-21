@@ -52,10 +52,10 @@ class Product:
             'code': self.code,
             'description': description,
             'list_price': self.list_price,
-            'category': {
-                'id': self.category.id,
-                'name': self.category.name,
-            } if self.category else {},
+            'categories': [{
+                'id': category.id,
+                'name': category.name,
+            } for category in self.categories],
             'tree_nodes': [{
                 'id': node.id,
                 'name': node.node.name,
@@ -428,6 +428,13 @@ class ProductAttribute:
         },
         depends=['filterable']
     )
+
+    @classmethod
+    def view_attributes(cls):
+        return super(ProductAttribute, cls).view_attributes() + [
+            ('//separator[@id="settings"]', "states", {
+                "invisible": ~Bool(Eval("filterable"))
+                })]
 
     @staticmethod
     def default_filterable():
