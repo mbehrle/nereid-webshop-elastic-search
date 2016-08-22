@@ -71,6 +71,7 @@ class TestProduct(NereidTestCase):
         """
         category, = self.ProductCategory.create([{
             'name': 'Test Category',
+            'accounting': True,
         }])
         uom, = self.Uom.search([('symbol', '=', 'u')])
 
@@ -81,6 +82,7 @@ class TestProduct(NereidTestCase):
                     'name': 'Prøduçt 1 ünîçø∂e',
                     'type': 'goods',
                     'categories': [('add', [category.id])],
+                    'account_category': category.id,
                     'default_uom': uom.id,
                     'description': 'This is product 1',
                     'list_price': 5000,
@@ -90,6 +92,7 @@ class TestProduct(NereidTestCase):
                     'name': 'Product 2',
                     'type': 'goods',
                     'categories': [('add', [category.id])],
+                    'account_category': category.id,
                     'default_uom': uom.id,
                     'description': 'This is product 2',
                     'list_price': 3000,
@@ -99,6 +102,7 @@ class TestProduct(NereidTestCase):
                     'name': 'ActiveProduct',
                     'type': 'goods',
                     'categories': [('add', [category.id])],
+                    'account_category': category.id,
                     'default_uom': uom.id,
                     'description':
                         'This is product for active testing',
@@ -109,6 +113,7 @@ class TestProduct(NereidTestCase):
                     'name': 'DisplayProduct',
                     'type': 'goods',
                     'categories': [('add', [category.id])],
+                    'account_category': category.id,
                     'default_uom': uom.id,
                     'description': 'This is product for e-shop display testing',
                     'list_price': 3000,
@@ -118,6 +123,7 @@ class TestProduct(NereidTestCase):
                     'name': 'InactiveProduct',
                     'type': 'goods',
                     'categories': [('add', [category.id])],
+                    'account_category': category.id,
                     'default_uom': uom.id,
                     'description': 'This is product for inactive testing',
                     'list_price': 3000,
@@ -127,6 +133,7 @@ class TestProduct(NereidTestCase):
                     'name': 'NotDisplayProduct',
                     'type': 'goods',
                     'categories': [('add', [category.id])],
+                    'account_category': category.id,
                     'default_uom': uom.id,
                     'description': 'This is product for non-display testing',
                     'list_price': 3000,
@@ -478,8 +485,8 @@ class TestProduct(NereidTestCase):
         # Clear backlog list
         self.IndexBacklog.delete(self.IndexBacklog.search([]))
         self.assertEqual(self.IndexBacklog.search([], count=True), 0)
-        # Update the product
-        self.Product.write([product], {
+        # Update the product template
+        self.ProductTemplate.write([template], {
             'description': "Batman's ride",
         })
         self.assertEqual(self.IndexBacklog.search([], count=True), 1)
