@@ -46,7 +46,7 @@ class Product:
                 )
             })
 
-        return {
+        res = {
             'id': self.id,
             'name': self.name,
             'code': self.code,
@@ -69,6 +69,11 @@ class Product:
             'active': "true" if self.active else "false",
             'attributes': self.elastic_attributes_json(),
         }
+
+        if self.template.account_category:
+            res['account_category'] = self.template.account_category.name
+
+        return res
 
     def elastic_attributes_json(self):
         """
@@ -140,7 +145,7 @@ class Product:
                     'description', search_phrase, boost=0.5
                 ),
                 MatchQuery(
-                    'category.name', search_phrase
+                    'account_category', search_phrase
                 ),
                 NestedQuery(
                     'tree_nodes', BoolQuery(
@@ -345,6 +350,19 @@ class Product:
             )
 
         return results
+
+    @classmethod
+    def create(cls, vlist):
+        """
+        Create a record in elastic search on create
+        :param vlist: List of dictionaries of fields with values
+        """
+        IndexBacklog = Pool().get('elasticsearch.index_backlog')
+
+        products = super(Product, cls).create(vlist)
+        IndexBacklog.create_from_records(products)
+
+        return products
 
 
 class Template:
