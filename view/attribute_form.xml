@@ -4,8 +4,7 @@
         <label name="filterable"/>
         <field name="filterable"/>
         <newline />
-        <separator string="Additional Settings" id="settings" colspan="4"
-            states="{'invisible': ~Bool(Eval('filterable'))}"/>
+        <separator string="Additional Settings" id="settings" colspan="4"/>
         <group col="4" colspan="4" id="on_filter">
             <label name="display_count"/>
             <field name="display_count"/>

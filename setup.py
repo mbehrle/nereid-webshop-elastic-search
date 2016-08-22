@@ -78,7 +78,7 @@ requires = []
 
 MODULE2PREFIX = {
     'nereid_webshop': 'fio',
-    'product_attribute_strict': 'openlabs',
+    'product_attribute_strict': 'fio',
 }
 
 MODULE = "nereid_webshop_elastic_search"
