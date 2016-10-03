@@ -3,6 +3,7 @@
     tests/test_pagination.py
 
 """
+import os
 import time
 import datetime
 from dateutil.relativedelta import relativedelta
@@ -10,7 +11,7 @@ from decimal import Decimal
 from pyes.managers import Indices
 
 import trytond.tests.test_tryton
-from trytond.tests.test_tryton import POOL, USER, DB_NAME, CONTEXT
+from trytond.tests.test_tryton import POOL, USER, CONTEXT, with_transaction
 from trytond.transaction import Transaction
 from trytond.config import config
 from nereid.testing import NereidTestCase
@@ -18,6 +19,9 @@ from pagination import ElasticPagination
 
 config.add_section('elastic_search')
 config.set('elastic_search', 'server_uri', 'http://localhost:9200')
+config.set('database', 'path', '/tmp/tryton-test-db/')
+if not os.path.exists(config.get('database', 'path')):
+    os.makedirs(config.get('database', 'path'))
 
 
 class TestPagination(NereidTestCase):
@@ -331,50 +335,50 @@ class TestPagination(NereidTestCase):
         self.ElasticConfig.update_settings([self.ElasticConfig(1)])
         self.ElasticDocumentType.update_mapping([product_doc])
 
+    @with_transaction()
     def test_0010_elastic_pagination(self):
         """
         Tests the basic usage of ElasticPagination
         """
-        with Transaction().start(DB_NAME, USER, context=CONTEXT):
-            self.update_treenode_mapping()
+        self.update_treenode_mapping()
 
-            category, = self.ProductCategory.create([{
-                'name': 'Test Category',
+        category, = self.ProductCategory.create([{
+            'name': 'Test Category',
+        }])
+        uom, = self.Uom.search([('symbol', '=', 'u')])
+        template, = self.ProductTemplate.create([{
+            'name': 'GreatProduct',
+            'type': 'goods',
+            'categories': [('add', [category.id])],
+            'default_uom': uom.id,
+            'description': 'This is a product',
+            'list_price': Decimal(3000),
+            'cost_price': Decimal(2000),
+        }])
+
+        # Create a hundred product variants
+        for x in range(0, 100):
+            self.Product.create([{
+                'template': template.id,
+                'code': 'code_' + str(x),
+                'displayed_on_eshop': True,
+                'uri': 'prod_' + str(x)
             }])
-            uom, = self.Uom.search([('symbol', '=', 'u')])
-            template, = self.ProductTemplate.create([{
-                'name': 'GreatProduct',
-                'type': 'goods',
-                'category': category.id,
-                'default_uom': uom.id,
-                'description': 'This is a product',
-                'list_price': Decimal(3000),
-                'cost_price': Decimal(2000),
-            }])
 
-            # Create a hundred product variants
-            for x in range(0, 100):
-                self.Product.create([{
-                    'template': template.id,
-                    'code': 'code_' + str(x),
-                    'displayed_on_eshop': True,
-                    'uri': 'prod_' + str(x)
-                }])
+        self.IndexBacklog.update_index()
+        time.sleep(5)
 
-            self.IndexBacklog.update_index()
-            time.sleep(5)
+        self.assertEqual(self.IndexBacklog.search([], count=True), 0)
 
-            self.assertEqual(self.IndexBacklog.search([], count=True), 0)
+        search_obj = self.Product._quick_search_es('GreatProduct')
 
-            search_obj = self.Product._quick_search_es('GreatProduct')
+        pagination = ElasticPagination(
+            self.Product.__name__, search_obj, page=1, per_page=10
+        )
 
-            pagination = ElasticPagination(
-                self.Product.__name__, search_obj, page=1, per_page=10
-            )
+        self.assertEqual(pagination.count, 100)
+        self.assertEqual(pagination.pages, 10)
+        self.assertEqual(pagination.begin_count, 1)
+        self.assertEqual(pagination.end_count, 10)
 
-            self.assertEqual(pagination.count, 100)
-            self.assertEqual(pagination.pages, 10)
-            self.assertEqual(pagination.begin_count, 1)
-            self.assertEqual(pagination.end_count, 10)
-
-            self.clear_server()
+        self.clear_server()
