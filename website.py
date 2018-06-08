@@ -4,12 +4,16 @@
 
 
 '''
+import logging
+
 from trytond.pool import Pool, PoolMeta
 from nereid import request, route, render_template
 from pagination import ElasticPagination
 
 __metaclass__ = PoolMeta
 __all__ = ['Website']
+
+logger = logging.getLogger(__name__)
 
 
 class Website:
@@ -47,8 +51,6 @@ class Website:
 
         page = request.args.get('page', 1, type=int)
         phrase = request.args.get('q', '')
-
-        logger = Pool().get('elasticsearch.configuration').get_logger()
 
         search_obj = Product._quick_search_es(phrase)
 
